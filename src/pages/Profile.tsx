@@ -1,4 +1,3 @@
-
 import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -11,6 +10,23 @@ import { Pencil, User, Upload, Twitter, Github, Linkedin } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 import type { ProfileFormData } from "@/types/profile";
+
+interface DatabaseProfile {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  full_name: string | null;
+  username: string | null;
+  website: string | null;
+  avatar_url: string | null;
+  bio?: string | null;
+  location?: string | null;
+  social_links?: {
+    twitter?: string;
+    github?: string;
+    linkedin?: string;
+  } | null;
+}
 
 const profileSchema = z.object({
   full_name: z.string().min(2, "Name must be at least 2 characters").max(100),
@@ -56,21 +72,22 @@ const Profile = () => {
 
       if (error) throw error;
 
-      // Handle potential null values from the database
+      const profileData = data as DatabaseProfile;
+
       setFormData({
-        full_name: data.full_name ?? "",
-        username: data.username ?? "",
-        website: data.website ?? "",
-        bio: (data as any).bio ?? "",
-        location: (data as any).location ?? "",
+        full_name: profileData.full_name ?? "",
+        username: profileData.username ?? "",
+        website: profileData.website ?? "",
+        bio: profileData.bio ?? "",
+        location: profileData.location ?? "",
         social_links: {
-          twitter: (data as any).social_links?.twitter ?? "",
-          github: (data as any).social_links?.github ?? "",
-          linkedin: (data as any).social_links?.linkedin ?? ""
+          twitter: profileData.social_links?.twitter ?? "",
+          github: profileData.social_links?.github ?? "",
+          linkedin: profileData.social_links?.linkedin ?? ""
         }
       });
       
-      return data;
+      return profileData;
     },
     enabled: !!user?.id,
   });
@@ -265,7 +282,7 @@ const Profile = () => {
                   className="h-24"
                 />
               ) : (
-                <p className="mt-1">{profile?.bio || "Not set"}</p>
+                <p className="mt-1">{(profile as DatabaseProfile)?.bio || "Not set"}</p>
               )}
             </div>
 
@@ -280,7 +297,7 @@ const Profile = () => {
                   placeholder="Where are you based?"
                 />
               ) : (
-                <p className="mt-1">{profile?.location || "Not set"}</p>
+                <p className="mt-1">{(profile as DatabaseProfile)?.location || "Not set"}</p>
               )}
             </div>
 
@@ -333,7 +350,7 @@ const Profile = () => {
                     />
                   </div>
                   <div className="flex items-center gap-2">
-                    <GitHub className="w-4 h-4 text-gray-500" />
+                    <Github className="w-4 h-4 text-gray-500" />
                     <Input
                       value={formData.social_links.github}
                       onChange={(e) =>
@@ -349,7 +366,7 @@ const Profile = () => {
                     />
                   </div>
                   <div className="flex items-center gap-2">
-                    <LinkedIn className="w-4 h-4 text-gray-500" />
+                    <Linkedin className="w-4 h-4 text-gray-500" />
                     <Input
                       value={formData.social_links.linkedin}
                       onChange={(e) =>
@@ -367,9 +384,9 @@ const Profile = () => {
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {profile?.social_links?.twitter && (
+                  {(profile as DatabaseProfile)?.social_links?.twitter && (
                     <a
-                      href={profile.social_links.twitter}
+                      href={(profile as DatabaseProfile).social_links?.twitter}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex items-center gap-2 text-primary hover:underline"
@@ -378,25 +395,25 @@ const Profile = () => {
                       Twitter
                     </a>
                   )}
-                  {profile?.social_links?.github && (
+                  {(profile as DatabaseProfile)?.social_links?.github && (
                     <a
-                      href={profile.social_links.github}
+                      href={(profile as DatabaseProfile).social_links?.github}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex items-center gap-2 text-primary hover:underline"
                     >
-                      <GitHub className="w-4 h-4" />
+                      <Github className="w-4 h-4" />
                       GitHub
                     </a>
                   )}
-                  {profile?.social_links?.linkedin && (
+                  {(profile as DatabaseProfile)?.social_links?.linkedin && (
                     <a
-                      href={profile.social_links.linkedin}
+                      href={(profile as DatabaseProfile).social_links?.linkedin}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex items-center gap-2 text-primary hover:underline"
                     >
-                      <LinkedIn className="w-4 h-4" />
+                      <Linkedin className="w-4 h-4" />
                       LinkedIn
                     </a>
                   )}
