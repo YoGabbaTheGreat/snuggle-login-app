@@ -32,9 +32,13 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
-import { Plus } from "lucide-react";
+import { Plus, Loader2 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import type { CreateClickInput, ClickFrequency } from "@/types/click";
 import { supabase } from "@/integrations/supabase/client";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
+import { Badge } from "@/components/ui/badge";
+import { X } from "lucide-react";
 
 const createClickSchema = z.object({
   name: z.string().min(3, "Name must be at least 3 characters").max(50),
@@ -42,21 +46,43 @@ const createClickSchema = z.object({
   schedule_frequency: z.enum(["daily", "weekly", "monthly"]).optional(),
   schedule_day: z.number().min(1).max(31).optional(),
   schedule_time: z.string().optional(),
+  members: z.array(z.string()).optional(),
 });
+
+type FormData = z.infer<typeof createClickSchema>;
 
 export function CreateClickDialog() {
   const [open, setOpen] = useState(false);
+  const [selectedMembers, setSelectedMembers] = useState<Array<{ id: string; email: string }>>([]);
+  const [commandOpen, setCommandOpen] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
-  const form = useForm<CreateClickInput>({
+
+  const form = useForm<FormData>({
     resolver: zodResolver(createClickSchema),
     defaultValues: {
       name: "",
       description: "",
+      members: [],
     },
   });
 
-  const onSubmit = async (data: CreateClickInput) => {
+  // Fetch available users to invite
+  const { data: users, isLoading: loadingUsers } = useQuery({
+    queryKey: ["available-users"],
+    queryFn: async () => {
+      const { data: profiles, error } = await supabase
+        .from("profiles")
+        .select("id, email:username")
+        .neq("id", user?.id);
+
+      if (error) throw error;
+      return profiles;
+    },
+    enabled: open, // Only fetch when dialog is open
+  });
+
+  const onSubmit = async (data: FormData) => {
     if (!user?.id) {
       toast({
         variant: "destructive",
@@ -84,7 +110,7 @@ export function CreateClickDialog() {
       if (clickError) throw clickError;
 
       // Add the creator as an admin member
-      const { error: memberError } = await supabase
+      const { error: creatorError } = await supabase
         .from("click_members")
         .insert({
           click_id: click.id,
@@ -92,13 +118,29 @@ export function CreateClickDialog() {
           role: "admin",
         });
 
-      if (memberError) throw memberError;
+      if (creatorError) throw creatorError;
+
+      // Add selected members
+      if (selectedMembers.length > 0) {
+        const { error: membersError } = await supabase
+          .from("click_members")
+          .insert(
+            selectedMembers.map(member => ({
+              click_id: click.id,
+              user_id: member.id,
+              role: "member",
+            }))
+          );
+
+        if (membersError) throw membersError;
+      }
 
       toast({
         title: "Click created!",
         description: "Your new Click has been created successfully.",
       });
       setOpen(false);
+      setSelectedMembers([]);
       form.reset();
     } catch (error) {
       toast({
@@ -109,6 +151,10 @@ export function CreateClickDialog() {
     }
   };
 
+  const removeSelectedMember = (userId: string) => {
+    setSelectedMembers(prev => prev.filter(member => member.id !== userId));
+  };
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -117,7 +163,7 @@ export function CreateClickDialog() {
           Create Click
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Create a new Click</DialogTitle>
           <DialogDescription>
@@ -190,11 +236,76 @@ export function CreateClickDialog() {
               )}
             />
 
+            <FormItem>
+              <FormLabel>Invite Members</FormLabel>
+              <Dialog open={commandOpen} onOpenChange={setCommandOpen}>
+                <DialogTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    className="w-full justify-between"
+                  >
+                    {loadingUsers ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      "Select members to invite"
+                    )}
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="p-0">
+                  <Command>
+                    <CommandInput placeholder="Search users..." />
+                    <CommandEmpty>No users found.</CommandEmpty>
+                    <CommandGroup>
+                      {users?.map((user) => (
+                        <CommandItem
+                          key={user.id}
+                          onSelect={() => {
+                            setSelectedMembers(prev => {
+                              const exists = prev.find(member => member.id === user.id);
+                              if (!exists) {
+                                return [...prev, { id: user.id, email: user.email }];
+                              }
+                              return prev;
+                            });
+                            setCommandOpen(false);
+                          }}
+                        >
+                          {user.email}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </Command>
+                </DialogContent>
+              </Dialog>
+              <div className="flex flex-wrap gap-2 mt-2">
+                {selectedMembers.map((member) => (
+                  <Badge key={member.id} variant="secondary">
+                    {member.email}
+                    <button
+                      type="button"
+                      className="ml-1 hover:text-destructive"
+                      onClick={() => removeSelectedMember(member.id)}
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </Badge>
+                ))}
+              </div>
+              <FormDescription>
+                Select users to invite to your Click
+              </FormDescription>
+            </FormItem>
+
             <div className="flex justify-end space-x-2">
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setOpen(false)}
+                onClick={() => {
+                  setOpen(false);
+                  setSelectedMembers([]);
+                  form.reset();
+                }}
               >
                 Cancel
               </Button>
