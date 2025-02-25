@@ -182,12 +182,17 @@ const Profile = () => {
   return (
     <div className="min-h-screen bg-surface p-6">
       <div className="max-w-2xl mx-auto">
-        <div className="glass-panel p-8 space-y-6">
-          <div className="flex justify-between items-center">
-            <h1 className="text-2xl font-semibold">Profile</h1>
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-2xl font-semibold">Profile</h1>
+          <div className="space-x-2">
             <Button
               variant="outline"
-              size="sm"
+              onClick={() => navigate('/dashboard')}
+            >
+              Go to Dashboard
+            </Button>
+            <Button
+              variant="default"
               onClick={() => {
                 if (isEditing) {
                   handleUpdate();
@@ -206,7 +211,9 @@ const Profile = () => {
               )}
             </Button>
           </div>
+        </div>
 
+        <div className="glass-panel p-8 space-y-6">
           <div className="flex flex-col items-center space-y-4">
             <div className="relative">
               <div className="w-24 h-24 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
