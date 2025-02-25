@@ -7,9 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
-import { Pencil, User, Upload, Twitter, GitHub, LinkedIn } from "lucide-react";
+import { Pencil, User, Upload, Twitter, Github, Linkedin } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
+import type { ProfileFormData } from "@/types/profile";
 
 const profileSchema = z.object({
   full_name: z.string().min(2, "Name must be at least 2 characters").max(100),
@@ -31,7 +32,7 @@ const Profile = () => {
   const [isEditing, setIsEditing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<ProfileFormData>({
     full_name: "",
     username: "",
     website: "",
@@ -54,18 +55,21 @@ const Profile = () => {
         .single();
 
       if (error) throw error;
+
+      // Handle potential null values from the database
       setFormData({
-        full_name: data.full_name || "",
-        username: data.username || "",
-        website: data.website || "",
-        bio: data.bio || "",
-        location: data.location || "",
-        social_links: data.social_links || {
-          twitter: "",
-          github: "",
-          linkedin: ""
+        full_name: data.full_name ?? "",
+        username: data.username ?? "",
+        website: data.website ?? "",
+        bio: (data as any).bio ?? "",
+        location: (data as any).location ?? "",
+        social_links: {
+          twitter: (data as any).social_links?.twitter ?? "",
+          github: (data as any).social_links?.github ?? "",
+          linkedin: (data as any).social_links?.linkedin ?? ""
         }
       });
+      
       return data;
     },
     enabled: !!user?.id,
