@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   Dialog,
   DialogContent,
@@ -46,6 +47,7 @@ const createClickSchema = z.object({
 export function CreateClickDialog() {
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
+  const { user } = useAuth();
   const form = useForm<CreateClickInput>({
     resolver: zodResolver(createClickSchema),
     defaultValues: {
@@ -55,6 +57,15 @@ export function CreateClickDialog() {
   });
 
   const onSubmit = async (data: CreateClickInput) => {
+    if (!user?.id) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "You must be logged in to create a Click.",
+      });
+      return;
+    }
+
     try {
       // Insert the Click
       const { data: click, error: clickError } = await supabase
@@ -65,6 +76,7 @@ export function CreateClickDialog() {
           schedule_frequency: data.schedule_frequency,
           schedule_day: data.schedule_day,
           schedule_time: data.schedule_time,
+          created_by: user.id,
         })
         .select()
         .single();
@@ -76,6 +88,7 @@ export function CreateClickDialog() {
         .from("click_members")
         .insert({
           click_id: click.id,
+          user_id: user.id,
           role: "admin",
         });
 
