@@ -7,7 +7,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -16,43 +15,24 @@ import { Button } from "@/components/ui/button";
 import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
-import { Plus, Loader2, X } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
-import type { ClickFrequency } from "@/types/click";
+import { Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
-import { Badge } from "@/components/ui/badge";
 
 const createClickSchema = z.object({
   name: z.string().min(3, "Name must be at least 3 characters").max(50),
-  description: z.string().max(500).optional(),
-  schedule_frequency: z.enum(["daily", "weekly", "monthly"] as const).optional(),
-  schedule_day: z.coerce.number().min(1).max(31).optional().nullable(),
-  schedule_time: z.string().optional().nullable(),
 });
 
 type FormData = z.infer<typeof createClickSchema>;
 
 export function CreateClickDialog() {
   const [open, setOpen] = useState(false);
-  const [selectedMembers, setSelectedMembers] = useState<Array<{ id: string; email: string }>>([]);
-  const [commandOpen, setCommandOpen] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -60,31 +40,7 @@ export function CreateClickDialog() {
     resolver: zodResolver(createClickSchema),
     defaultValues: {
       name: "",
-      description: "",
-      schedule_frequency: undefined,
-      schedule_day: null,
-      schedule_time: null,
     },
-  });
-
-  // Fetch available users to invite
-  const { data: users, isLoading: loadingUsers } = useQuery({
-    queryKey: ["available-users"],
-    queryFn: async () => {
-      if (!user?.id) return [];
-      
-      const { data: profiles, error } = await supabase
-        .from("profiles")
-        .select("id, email:username")
-        .neq("id", user.id);
-
-      if (error) {
-        console.error("Error fetching users:", error);
-        throw error;
-      }
-      return profiles;
-    },
-    enabled: open && !!user?.id,
   });
 
   const onSubmit = async (data: FormData) => {
@@ -98,15 +54,11 @@ export function CreateClickDialog() {
     }
 
     try {
-      // First, create the Click
+      // Create the Click
       const { data: click, error: clickError } = await supabase
         .from("clicks")
         .insert({
           name: data.name,
-          description: data.description || null,
-          schedule_frequency: data.schedule_frequency || null,
-          schedule_day: data.schedule_day || null,
-          schedule_time: data.schedule_time || null,
           created_by: user.id,
         })
         .select()
@@ -117,7 +69,7 @@ export function CreateClickDialog() {
         throw clickError;
       }
 
-      // Then, add the creator as a member with admin role
+      // Add the creator as a member with admin role
       const { error: creatorError } = await supabase
         .from("click_members")
         .insert({
@@ -131,31 +83,12 @@ export function CreateClickDialog() {
         throw creatorError;
       }
 
-      // Finally, add any selected members
-      if (selectedMembers.length > 0) {
-        const membersToAdd = selectedMembers.map(member => ({
-          click_id: click.id,
-          user_id: member.id,
-          role: "member",
-        }));
-
-        const { error: membersError } = await supabase
-          .from("click_members")
-          .insert(membersToAdd);
-
-        if (membersError) {
-          console.error("Error adding members:", membersError);
-          throw membersError;
-        }
-      }
-
       toast({
         title: "Click created!",
         description: "Your new Click has been created successfully.",
       });
       
       setOpen(false);
-      setSelectedMembers([]);
       form.reset();
       
     } catch (error) {
@@ -166,10 +99,6 @@ export function CreateClickDialog() {
         description: error instanceof Error ? error.message : "There was an error creating your Click.",
       });
     }
-  };
-
-  const removeSelectedMember = (userId: string) => {
-    setSelectedMembers(prev => prev.filter(member => member.id !== userId));
   };
 
   return (
@@ -183,9 +112,6 @@ export function CreateClickDialog() {
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Create a new Click</DialogTitle>
-          <DialogDescription>
-            Create a private group to share photos with friends and family.
-          </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
@@ -199,122 +125,10 @@ export function CreateClickDialog() {
                   <FormControl>
                     <Input placeholder="e.g., Family Photos" {...field} />
                   </FormControl>
-                  <FormDescription>
-                    Choose a name for your Click group
-                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
             />
-
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Description</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="What's this Click about?"
-                      {...field}
-                      value={field.value || ""}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="schedule_frequency"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Posting Schedule</FormLabel>
-                  <Select
-                    onValueChange={(value: ClickFrequency) => field.onChange(value)}
-                    value={field.value}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="How often should members post?" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="daily">Daily</SelectItem>
-                      <SelectItem value="weekly">Weekly</SelectItem>
-                      <SelectItem value="monthly">Monthly</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormDescription>
-                    Set how often members should post photos
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormItem>
-              <FormLabel>Invite Members</FormLabel>
-              <Dialog open={commandOpen} onOpenChange={setCommandOpen}>
-                <DialogTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    className="w-full justify-between"
-                    type="button"
-                  >
-                    {loadingUsers ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      "Select members to invite"
-                    )}
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="p-0">
-                  <Command>
-                    <CommandInput placeholder="Search users..." />
-                    <CommandEmpty>No users found.</CommandEmpty>
-                    <CommandGroup>
-                      {users?.map((user) => (
-                        <CommandItem
-                          key={user.id}
-                          onSelect={() => {
-                            setSelectedMembers(prev => {
-                              const exists = prev.find(member => member.id === user.id);
-                              if (!exists) {
-                                return [...prev, { id: user.id, email: user.email }];
-                              }
-                              return prev;
-                            });
-                            setCommandOpen(false);
-                          }}
-                        >
-                          {user.email}
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </Command>
-                </DialogContent>
-              </Dialog>
-              <div className="flex flex-wrap gap-2 mt-2">
-                {selectedMembers.map((member) => (
-                  <Badge key={member.id} variant="secondary">
-                    {member.email}
-                    <button
-                      type="button"
-                      className="ml-1 hover:text-destructive"
-                      onClick={() => removeSelectedMember(member.id)}
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </Badge>
-                ))}
-              </div>
-              <FormDescription>
-                Select users to invite to your Click
-              </FormDescription>
-            </FormItem>
 
             <div className="flex justify-end space-x-2">
               <Button
@@ -322,7 +136,6 @@ export function CreateClickDialog() {
                 variant="outline"
                 onClick={() => {
                   setOpen(false);
-                  setSelectedMembers([]);
                   form.reset();
                 }}
               >
