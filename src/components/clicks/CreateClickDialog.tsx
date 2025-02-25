@@ -32,21 +32,19 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
-import { Plus, Loader2 } from "lucide-react";
+import { Plus, Loader2, X } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import type { CreateClickInput, ClickFrequency } from "@/types/click";
+import type { ClickFrequency } from "@/types/click";
 import { supabase } from "@/integrations/supabase/client";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
 import { Badge } from "@/components/ui/badge";
-import { X } from "lucide-react";
 
 const createClickSchema = z.object({
   name: z.string().min(3, "Name must be at least 3 characters").max(50),
   description: z.string().max(500).optional(),
-  schedule_frequency: z.enum(["daily", "weekly", "monthly"]).optional(),
-  schedule_day: z.number().min(1).max(31).optional(),
+  schedule_frequency: z.enum(["daily", "weekly", "monthly"] as const).optional(),
+  schedule_day: z.coerce.number().min(1).max(31).optional(),
   schedule_time: z.string().optional(),
-  members: z.array(z.string()).optional(),
 });
 
 type FormData = z.infer<typeof createClickSchema>;
@@ -63,7 +61,9 @@ export function CreateClickDialog() {
     defaultValues: {
       name: "",
       description: "",
-      members: [],
+      schedule_frequency: undefined,
+      schedule_day: undefined,
+      schedule_time: undefined,
     },
   });
 
@@ -71,15 +71,20 @@ export function CreateClickDialog() {
   const { data: users, isLoading: loadingUsers } = useQuery({
     queryKey: ["available-users"],
     queryFn: async () => {
+      if (!user?.id) return [];
+      
       const { data: profiles, error } = await supabase
         .from("profiles")
         .select("id, email:username")
-        .neq("id", user?.id);
+        .neq("id", user.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error("Error fetching users:", error);
+        throw error;
+      }
       return profiles;
     },
-    enabled: open, // Only fetch when dialog is open
+    enabled: open && !!user?.id,
   });
 
   const onSubmit = async (data: FormData) => {
@@ -93,21 +98,31 @@ export function CreateClickDialog() {
     }
 
     try {
+      console.log("Submitting data:", {
+        ...data,
+        created_by: user.id,
+      });
+
       // Insert the Click
       const { data: click, error: clickError } = await supabase
         .from("clicks")
         .insert({
           name: data.name,
-          description: data.description,
-          schedule_frequency: data.schedule_frequency,
-          schedule_day: data.schedule_day,
-          schedule_time: data.schedule_time,
+          description: data.description || null,
+          schedule_frequency: data.schedule_frequency || null,
+          schedule_day: data.schedule_day || null,
+          schedule_time: data.schedule_time || null,
           created_by: user.id,
         })
         .select()
         .single();
 
-      if (clickError) throw clickError;
+      if (clickError) {
+        console.error("Error creating click:", clickError);
+        throw clickError;
+      }
+
+      console.log("Click created:", click);
 
       // Add the creator as an admin member
       const { error: creatorError } = await supabase
@@ -118,7 +133,10 @@ export function CreateClickDialog() {
           role: "admin",
         });
 
-      if (creatorError) throw creatorError;
+      if (creatorError) {
+        console.error("Error adding creator as member:", creatorError);
+        throw creatorError;
+      }
 
       // Add selected members
       if (selectedMembers.length > 0) {
@@ -132,7 +150,10 @@ export function CreateClickDialog() {
             }))
           );
 
-        if (membersError) throw membersError;
+        if (membersError) {
+          console.error("Error adding members:", membersError);
+          throw membersError;
+        }
       }
 
       toast({
@@ -143,10 +164,11 @@ export function CreateClickDialog() {
       setSelectedMembers([]);
       form.reset();
     } catch (error) {
+      console.error("Error creating Click:", error);
       toast({
         variant: "destructive",
         title: "Error",
-        description: "There was an error creating your Click.",
+        description: error instanceof Error ? error.message : "There was an error creating your Click.",
       });
     }
   };
@@ -200,6 +222,7 @@ export function CreateClickDialog() {
                     <Textarea
                       placeholder="What's this Click about?"
                       {...field}
+                      value={field.value || ""}
                     />
                   </FormControl>
                   <FormMessage />
@@ -214,8 +237,8 @@ export function CreateClickDialog() {
                 <FormItem>
                   <FormLabel>Posting Schedule</FormLabel>
                   <Select
-                    onValueChange={field.onChange}
-                    defaultValue={field.value}
+                    onValueChange={(value: ClickFrequency) => field.onChange(value)}
+                    value={field.value}
                   >
                     <FormControl>
                       <SelectTrigger>
@@ -244,6 +267,7 @@ export function CreateClickDialog() {
                     variant="outline"
                     role="combobox"
                     className="w-full justify-between"
+                    type="button"
                   >
                     {loadingUsers ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
