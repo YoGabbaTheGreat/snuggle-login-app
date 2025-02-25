@@ -1,61 +1,89 @@
 
-import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
-import { Button } from "@/components/ui/button";
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { LogOut, User } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { CreateClickDialog } from "@/components/clicks/CreateClickDialog";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Users } from "lucide-react";
+import type { Click } from "@/types/click";
 
-const Dashboard = () => {
+export default function Dashboard() {
   const { user } = useAuth();
-  const { toast } = useToast();
   const navigate = useNavigate();
 
-  const handleSignOut = async () => {
-    try {
-      const { error } = await supabase.auth.signOut();
+  const { data: clicks, isLoading } = useQuery({
+    queryKey: ["clicks"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("clicks")
+        .select("*")
+        .order("created_at", { ascending: false });
+
       if (error) throw error;
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "There was a problem signing out.",
-      });
+      return data as Click[];
+    },
+  });
+
+  useEffect(() => {
+    if (!user) {
+      navigate("/auth");
     }
-  };
+  }, [user, navigate]);
 
   return (
-    <div className="min-h-screen bg-surface p-6">
-      <div className="max-w-4xl mx-auto">
-        <div className="glass-panel p-8">
-          <div className="flex justify-between items-center mb-6">
-            <h1 className="text-2xl font-semibold">Welcome back!</h1>
-            <div className="flex gap-4">
-              <Button
-                variant="outline"
-                onClick={() => navigate('/profile')}
-              >
-                <User className="w-4 h-4 mr-2" />
-                Profile
-              </Button>
-              <Button
-                variant="outline"
-                onClick={handleSignOut}
-              >
-                <LogOut className="w-4 h-4 mr-2" />
-                Sign Out
-              </Button>
-            </div>
-          </div>
-          <div className="space-y-4">
-            <p className="text-gray-600">
-              Signed in as: {user?.email}
-            </p>
-          </div>
-        </div>
+    <div className="container mx-auto p-6">
+      <div className="mb-8">
+        <h1 className="text-4xl font-bold mb-2">Welcome back!</h1>
+        <p className="text-muted-foreground">
+          Create or join Clicks to share photos with friends and family.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <Card className="border-dashed">
+          <CardContent className="pt-6">
+            <CreateClickDialog />
+          </CardContent>
+        </Card>
+
+        {isLoading ? (
+          Array.from({ length: 3 }).map((_, i) => (
+            <Card key={i}>
+              <CardHeader>
+                <Skeleton className="h-4 w-[200px]" />
+                <Skeleton className="h-3 w-[160px]" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-20 w-full" />
+              </CardContent>
+            </Card>
+          ))
+        ) : (
+          clicks?.map((click) => (
+            <Card
+              key={click.id}
+              className="cursor-pointer hover:shadow-md transition-shadow"
+              onClick={() => navigate(`/clicks/${click.id}`)}
+            >
+              <CardHeader>
+                <CardTitle>{click.name}</CardTitle>
+                <CardDescription className="flex items-center gap-1">
+                  <Users className="w-4 h-4" />
+                  {click.description}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground">
+                  Created {new Date(click.created_at).toLocaleDateString()}
+                </p>
+              </CardContent>
+            </Card>
+          ))
+        )}
       </div>
     </div>
   );
-};
-
-export default Dashboard;
+}
