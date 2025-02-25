@@ -55,65 +55,50 @@ export function CreateClickDialog() {
     }
 
     try {
-      console.log("Creating click with data:", { name: data.name, created_by: user.id });
-      
-      const { data: newClick, error: clickError } = await supabase
-        .from("clicks")
-        .insert([{  // Note: Wrapping the object in an array
+      // First, create the click with minimal data
+      const { data: clickData, error: clickError } = await supabase
+        .from('clicks')
+        .insert({
           name: data.name,
-          created_by: user.id,
-          description: null,  // Explicitly set optional fields
-          schedule_frequency: null,
-          schedule_day: null,
-          schedule_time: null,
-        }])
-        .select('*')
-        .maybeSingle();
+          created_by: user.id
+        })
+        .select()
+        .single();
 
-      if (clickError) {
-        console.error("Error creating click:", clickError);
-        throw clickError;
+      if (clickError || !clickData) {
+        throw new Error(clickError?.message || "Failed to create click");
       }
 
-      if (!newClick) {
-        throw new Error("Failed to create click - no data returned");
-      }
-
-      console.log("Click created successfully:", newClick);
-
-      // Now create the membership record
+      // Then create the membership
       const { error: memberError } = await supabase
-        .from("click_members")
-        .insert([{  // Note: Wrapping the object in an array
-          click_id: newClick.id,
+        .from('click_members')
+        .insert({
+          click_id: clickData.id,
           user_id: user.id,
-          role: "admin"
-        }]);
+          role: 'admin'
+        });
 
       if (memberError) {
-        console.error("Error creating membership:", memberError);
+        console.error("Membership error:", memberError);
         toast({
-          title: "Partial success",
-          description: "Click was created but there was an error adding you as a member.",
+          title: "Partial Success",
+          description: "Click created but membership failed. Please try again.",
         });
       } else {
         toast({
-          title: "Success!",
-          description: "Your new Click has been created.",
+          title: "Success",
+          description: "Click created successfully!",
         });
+        setOpen(false);
+        form.reset();
       }
 
-      setOpen(false);
-      form.reset();
-
     } catch (error) {
-      console.error("Error in click creation:", error);
+      console.error("Creation error:", error);
       toast({
         variant: "destructive",
         title: "Error",
-        description: error instanceof Error 
-          ? error.message 
-          : "Failed to create Click. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to create click",
       });
     }
   };
