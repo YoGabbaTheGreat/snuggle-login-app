@@ -27,11 +27,15 @@ export default function Dashboard() {
     },
   });
 
+  // If they're not logged in, redirect to auth
   useEffect(() => {
     if (!user) {
       navigate("/auth");
     }
   }, [user, navigate]);
+
+  // If no user, don't render anything
+  if (!user) return null;
 
   return (
     <div className="container mx-auto p-6">
@@ -43,11 +47,14 @@ export default function Dashboard() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <Card className="border-dashed">
-          <CardContent className="pt-6">
-            <CreateClickDialog />
-          </CardContent>
-        </Card>
+        {/* Only show create button if user is authenticated */}
+        {user && (
+          <Card className="border-dashed">
+            <CardContent className="pt-6">
+              <CreateClickDialog />
+            </CardContent>
+          </Card>
+        )}
 
         {isLoading ? (
           Array.from({ length: 3 }).map((_, i) => (

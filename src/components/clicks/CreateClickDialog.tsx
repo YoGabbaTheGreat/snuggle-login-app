@@ -45,56 +45,40 @@ export function CreateClickDialog() {
   });
 
   const onSubmit = async (data: FormData) => {
-    if (!user?.id) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "You must be logged in to create a Click.",
-      });
-      return;
-    }
-
     try {
-      // First, create the click with minimal data
-      const { data: clickData, error: clickError } = await supabase
+      // Create the click - we know the user has permission at this point
+      const { data: newClick, error: clickError } = await supabase
         .from('clicks')
         .insert({
           name: data.name,
-          created_by: user.id
+          created_by: user!.id
         })
         .select()
         .single();
 
-      if (clickError || !clickData) {
-        throw new Error(clickError?.message || "Failed to create click");
-      }
+      if (clickError) throw clickError;
 
-      // Then create the membership
+      // Set creator as admin member
       const { error: memberError } = await supabase
         .from('click_members')
         .insert({
-          click_id: clickData.id,
-          user_id: user.id,
+          click_id: newClick.id,
+          user_id: user!.id,
           role: 'admin'
         });
 
-      if (memberError) {
-        console.error("Membership error:", memberError);
-        toast({
-          title: "Partial Success",
-          description: "Click created but membership failed. Please try again.",
-        });
-      } else {
-        toast({
-          title: "Success",
-          description: "Click created successfully!",
-        });
-        setOpen(false);
-        form.reset();
-      }
+      if (memberError) throw memberError;
+
+      toast({
+        title: "Success",
+        description: "Click created successfully!",
+      });
+      
+      setOpen(false);
+      form.reset();
 
     } catch (error) {
-      console.error("Creation error:", error);
+      console.error("Error:", error);
       toast({
         variant: "destructive",
         title: "Error",
