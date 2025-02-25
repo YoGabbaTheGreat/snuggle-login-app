@@ -1,7 +1,39 @@
 
-import { Facebook, Google } from "lucide-react";
+import { Chrome, Facebook } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 const AuthPanel = () => {
+  const { toast } = useToast();
+
+  const handleGoogleSignIn = async () => {
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
+        },
+      });
+
+      if (error) {
+        toast({
+          variant: "destructive",
+          title: "Authentication Error",
+          description: error.message,
+        });
+      }
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Authentication Error",
+        description: "An unexpected error occurred during sign in.",
+      });
+    }
+  };
+
   return (
     <div className="glass-panel p-8 w-full max-w-md mx-auto animate-fade-in">
       <div className="space-y-6">
@@ -11,8 +43,11 @@ const AuthPanel = () => {
         </div>
 
         <div className="space-y-4">
-          <button className="auth-button bg-white text-gray-700 border-gray-200 hover:bg-gray-50">
-            <Google className="w-5 h-5" />
+          <button 
+            onClick={handleGoogleSignIn}
+            className="auth-button bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
+          >
+            <Chrome className="w-5 h-5" />
             <span>Continue with Google</span>
           </button>
 
