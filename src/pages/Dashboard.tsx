@@ -15,16 +15,18 @@ export default function Dashboard() {
   const navigate = useNavigate();
 
   const { data: clicks, isLoading } = useQuery({
-    queryKey: ["clicks"],
+    queryKey: ["clicks", user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("clicks")
         .select("*")
+        .eq('created_by', user?.id)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
       return data as Click[];
     },
+    enabled: !!user,
   });
 
   // If they're not logged in, redirect to auth
