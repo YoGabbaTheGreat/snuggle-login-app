@@ -8,9 +8,11 @@ const AuthPanel = () => {
 
   const handleGoogleSignIn = async () => {
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
+      console.log('Initiating Google sign-in...');
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
+          redirectTo: window.location.origin,
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
@@ -18,7 +20,10 @@ const AuthPanel = () => {
         },
       });
 
+      console.log('Sign-in response:', { data, error });
+
       if (error) {
+        console.error('Auth error:', error);
         toast({
           variant: "destructive",
           title: "Authentication Error",
@@ -26,6 +31,7 @@ const AuthPanel = () => {
         });
       }
     } catch (error) {
+      console.error('Unexpected error:', error);
       toast({
         variant: "destructive",
         title: "Authentication Error",
