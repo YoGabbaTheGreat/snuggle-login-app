@@ -43,8 +43,8 @@ const createClickSchema = z.object({
   name: z.string().min(3, "Name must be at least 3 characters").max(50),
   description: z.string().max(500).optional(),
   schedule_frequency: z.enum(["daily", "weekly", "monthly"] as const).optional(),
-  schedule_day: z.coerce.number().min(1).max(31).optional(),
-  schedule_time: z.string().optional(),
+  schedule_day: z.coerce.number().min(1).max(31).optional().nullable(),
+  schedule_time: z.string().optional().nullable(),
 });
 
 type FormData = z.infer<typeof createClickSchema>;
@@ -62,8 +62,8 @@ export function CreateClickDialog() {
       name: "",
       description: "",
       schedule_frequency: undefined,
-      schedule_day: undefined,
-      schedule_time: undefined,
+      schedule_day: null,
+      schedule_time: null,
     },
   });
 
@@ -98,12 +98,7 @@ export function CreateClickDialog() {
     }
 
     try {
-      console.log("Submitting data:", {
-        ...data,
-        created_by: user.id,
-      });
-
-      // Insert the Click
+      // First, create the Click
       const { data: click, error: clickError } = await supabase
         .from("clicks")
         .insert({
@@ -122,9 +117,7 @@ export function CreateClickDialog() {
         throw clickError;
       }
 
-      console.log("Click created:", click);
-
-      // Add the creator as an admin member
+      // Then, add the creator as a member with admin role
       const { error: creatorError } = await supabase
         .from("click_members")
         .insert({
@@ -138,17 +131,17 @@ export function CreateClickDialog() {
         throw creatorError;
       }
 
-      // Add selected members
+      // Finally, add any selected members
       if (selectedMembers.length > 0) {
+        const membersToAdd = selectedMembers.map(member => ({
+          click_id: click.id,
+          user_id: member.id,
+          role: "member",
+        }));
+
         const { error: membersError } = await supabase
           .from("click_members")
-          .insert(
-            selectedMembers.map(member => ({
-              click_id: click.id,
-              user_id: member.id,
-              role: "member",
-            }))
-          );
+          .insert(membersToAdd);
 
         if (membersError) {
           console.error("Error adding members:", membersError);
@@ -160,9 +153,11 @@ export function CreateClickDialog() {
         title: "Click created!",
         description: "Your new Click has been created successfully.",
       });
+      
       setOpen(false);
       setSelectedMembers([]);
       form.reset();
+      
     } catch (error) {
       console.error("Error creating Click:", error);
       toast({
