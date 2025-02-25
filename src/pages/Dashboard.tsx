@@ -2,10 +2,14 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
+import { useNavigate } from "react-router-dom";
+import { LogOut, User } from "lucide-react";
 
 const Dashboard = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   const handleSignOut = async () => {
     try {
@@ -26,18 +30,27 @@ const Dashboard = () => {
         <div className="glass-panel p-8">
           <div className="flex justify-between items-center mb-6">
             <h1 className="text-2xl font-semibold">Welcome back!</h1>
-            <button
-              onClick={handleSignOut}
-              className="px-4 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-            >
-              Sign Out
-            </button>
+            <div className="flex gap-4">
+              <Button
+                variant="outline"
+                onClick={() => navigate('/profile')}
+              >
+                <User className="w-4 h-4 mr-2" />
+                Profile
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleSignOut}
+              >
+                <LogOut className="w-4 h-4 mr-2" />
+                Sign Out
+              </Button>
+            </div>
           </div>
           <div className="space-y-4">
             <p className="text-gray-600">
               Signed in as: {user?.email}
             </p>
-            {/* Add your dashboard content here */}
           </div>
         </div>
       </div>
