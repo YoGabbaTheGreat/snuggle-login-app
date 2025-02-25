@@ -25,6 +25,7 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/use-toast";
 import { Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
 
 const createClickSchema = z.object({
   name: z.string().min(3, "Name must be at least 3 characters").max(50),
@@ -36,6 +37,7 @@ export function CreateClickDialog() {
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
 
   const form = useForm<FormData>({
     resolver: zodResolver(createClickSchema),
@@ -46,28 +48,36 @@ export function CreateClickDialog() {
 
   const onSubmit = async (data: FormData) => {
     try {
-      // Create the click - we know the user has permission at this point
+      if (!user) {
+        throw new Error("You must be logged in to create a Click");
+      }
+
+      // Create the click
       const { data: newClick, error: clickError } = await supabase
         .from('clicks')
         .insert({
           name: data.name,
-          created_by: user!.id
+          created_by: user.id,
+          description: "Click members" // Adding a default description
         })
         .select()
         .single();
 
       if (clickError) throw clickError;
 
-      // Set creator as admin member
+      // Create the creator as an admin member
       const { error: memberError } = await supabase
         .from('click_members')
         .insert({
           click_id: newClick.id,
-          user_id: user!.id,
+          user_id: user.id,
           role: 'admin'
         });
 
       if (memberError) throw memberError;
+
+      // Invalidate the clicks query to refresh the dashboard
+      queryClient.invalidateQueries({ queryKey: ["clicks", user.id] });
 
       toast({
         title: "Success",
@@ -90,8 +100,8 @@ export function CreateClickDialog() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="w-full">
-          <Plus className="w-4 h-4 mr-2" />
+        <Button className="w-full h-[150px] flex flex-col items-center justify-center gap-4">
+          <Plus className="w-8 h-8" />
           Create Click
         </Button>
       </DialogTrigger>
