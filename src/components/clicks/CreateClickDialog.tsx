@@ -10,6 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import {
@@ -54,49 +55,51 @@ export function CreateClickDialog() {
     }
 
     try {
-      // Create the Click
-      const { data: click, error: clickError } = await supabase
+      // First, create the Click
+      const { data: newClick, error: clickError } = await supabase
         .from("clicks")
         .insert({
           name: data.name,
           created_by: user.id,
         })
         .select()
-        .single();
+        .maybeSingle();
 
-      if (clickError) {
-        console.error("Error creating click:", clickError);
-        throw clickError;
-      }
+      if (clickError) throw clickError;
+      if (!newClick) throw new Error("Failed to create click");
 
-      // Add the creator as a member with admin role
-      const { error: creatorError } = await supabase
+      // Then, create the membership
+      const { error: memberError } = await supabase
         .from("click_members")
         .insert({
-          click_id: click.id,
+          click_id: newClick.id,
           user_id: user.id,
           role: "admin",
         });
 
-      if (creatorError) {
-        console.error("Error adding creator as member:", creatorError);
-        throw creatorError;
+      if (memberError) {
+        console.error("Error adding member:", memberError);
+        // Even if adding membership fails, the click was created
+        toast({
+          title: "Click created",
+          description: "Click was created but there was an error adding you as a member.",
+        });
+      } else {
+        toast({
+          title: "Success!",
+          description: "Your new Click has been created.",
+        });
       }
-
-      toast({
-        title: "Click created!",
-        description: "Your new Click has been created successfully.",
-      });
       
       setOpen(false);
       form.reset();
       
     } catch (error) {
-      console.error("Error creating Click:", error);
+      console.error("Error:", error);
       toast({
         variant: "destructive",
         title: "Error",
-        description: error instanceof Error ? error.message : "There was an error creating your Click.",
+        description: error instanceof Error ? error.message : "Failed to create Click",
       });
     }
   };
@@ -112,6 +115,9 @@ export function CreateClickDialog() {
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Create a new Click</DialogTitle>
+          <DialogDescription>
+            Give your Click a name. You can customize other settings later.
+          </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
@@ -123,7 +129,11 @@ export function CreateClickDialog() {
                 <FormItem>
                   <FormLabel>Name</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g., Family Photos" {...field} />
+                    <Input 
+                      placeholder="e.g., Family Photos" 
+                      {...field}
+                      autoComplete="off"
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
